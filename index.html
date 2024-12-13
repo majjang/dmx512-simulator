@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DMX512 Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #3b82f6;
+            color: white;
+            font-size: 14px;
+        }
+
+        .button:hover {
+            background-color: #2563eb;
+        }
+
+        .button.reset {
+            background-color: #6b7280;
+        }
+
+        .hidden-file-input {
+            display: none;
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .info {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .grid-container {
+            overflow: auto;
+            margin-bottom: 20px;
+            max-height: 70vh;
+        }
+
+        .grid {
+            display: grid;
+            gap: 1px;
+            min-width: 100%;
+        }
+
+        .grid.color-mode {
+            grid-template-columns: repeat(100, 12px);
+        }
+
+        .grid.mono-mode {
+            grid-template-columns: repeat(100, 12px);
+        }
+
+        .box {
+            width: 12px;
+            height: 12px;
+            border: 1px solid #ddd;
+            position: relative;
+            font-size: 6px;
+            color: white;
+            text-shadow: 0 0 1px black;
+        }
+
+        .box:hover {
+            transform: scale(2);
+            z-index: 1;
+            border: 1px solid #000;
+        }
+
+        .box:hover::after {
+            content: attr(data-info);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        .timeline {
+            width: 100%;
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background-color: #3b82f6;
+            transition: width 0.1s ease;
+        }
+
+        select {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .frame-info {
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DMX512 Simulator</h1>
+        </div>
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" class="hidden-file-input">
+                <button class="button" onclick="document.getElementById('fileInput').click()">Open File</button>
+            </div>
+            <button class="button" id="playButton">Play</button>
+            <select id="displayMode">
+                <option value="color">Color Mode</option>
+                <option value="mono">Mono Mode</option>
+            </select>
+            <div class="checkbox-container">
+                <input type="checkbox" id="continueMode">
+                <label for="continueMode">Continue Mode</label>
+            </div>
+            <div class="input-container">
+                <label for="channelCount">Used channels:</label>
+                <input type="number" id="channelCount" min="1" max="512" value="100" style="width: 60px;">
+            </div>
+        </div>
+        <div class="info">
+            <div>Dwell Time: <span id="dwellTime">0</span>ms</div>
+            <div>Total Frames: <span id="totalFrames">0</span></div>
+            <div>Display Mode: <span id="currentMode">RGB Color (170 fixtures)</span></div>
+        </div>
+        <div class="grid-container">
+            <div id="dmxGrid" class="grid color-mode"></div>
+        </div>
+        <div class="timeline">
+            <div id="timelineProgress" class="timeline-progress"></div>
+        </div>
+        <div class="frame-info">
+            Frame: <span id="frameCount">0 / 0</span>
+        </div>
+    </div>
+<script>
+        class DMXSimulator {
+            constructor() {
+                this.dmxData = [];
+                this.currentFrame = 0;
+                this.isPlaying = false;
+                this.dwellTime = 100;
+                this.totalFrames = 0;
+                this.displayMode = 'color';
+                this.continueMode = false;
+                this.channelCount = 170;
+                this.playInterval = null;
+
+                this.initializeElements();
+                this.attachEventListeners();
+                this.updateDisplayMode();
+            }
+
+            initializeElements() {
+                this.fileInput = document.getElementById('fileInput');
+                this.playButton = document.getElementById('playButton');
+                this.displayModeSelect = document.getElementById('displayMode');
+                this.continueModeCheckbox = document.getElementById('continueMode');
+                this.channelCountInput = document.getElementById('channelCount');
+                this.dmxGrid = document.getElementById('dmxGrid');
+                this.dwellTimeSpan = document.getElementById('dwellTime');
+                this.totalFramesSpan = document.getElementById('totalFrames');
+                this.currentModeSpan = document.getElementById('currentMode');
+                this.timelineProgress = document.getElementById('timelineProgress');
+                this.frameCountSpan = document.getElementById('frameCount');
+            }
+
+            attachEventListeners() {
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+                this.playButton.addEventListener('click', () => this.togglePlayback());
+                this.displayModeSelect.addEventListener('change', (e) => {
+                    this.displayMode = e.target.value;
+                    const maxChannels = this.displayMode === 'color' ? 510 : 512;
+                    this.channelCountInput.max = maxChannels;
+                    this.channelCount = Math.min(this.channelCount, maxChannels);
+                    this.channelCountInput.value = this.channelCount;
+                    this.updateDisplayMode();
+                    this.renderFrame();
+                });
+                this.continueModeCheckbox.addEventListener('change', (e) => {
+                    this.continueMode = e.target.checked;
+                });
+                this.channelCountInput.addEventListener('change', (e) => {
+                    const maxChannels = this.displayMode === 'color' ? 510 : 512;
+                    const value = parseInt(e.target.value);
+                    this.channelCount = Math.min(Math.max(value, 1), maxChannels);
+                    this.channelCountInput.value = this.channelCount;
+                    this.updateGridStyle();
+                    this.renderFrame();
+                });
+            }
+
+            async handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const text = await file.text();
+                    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                    
+                    if (lines.length < 3) {
+                        console.error('Invalid file format');
+                        return;
+                    }
+
+                    this.dwellTime = parseInt(lines[0]);
+                    this.totalFrames = parseInt(lines[1]);
+                    
+                    if (isNaN(this.dwellTime) || isNaN(this.totalFrames)) {
+                        console.error('Invalid header information');
+                        return;
+                    }
+
+                    this.dmxData = lines.slice(2).map(line => 
+                        line.split(' ')
+                            .map(val => parseInt(val))
+                            .filter(val => !isNaN(val))
+                    );
+
+                    this.stopPlayback();
+                    this.updateInfo();
+                    this.renderFrame();
+                }
+            }
+
+            getMonoColor(value) {
+                const intensity = Math.floor((value / 255) * 100);
+                return `rgb(${intensity}%, ${intensity}%, ${intensity}%)`;
+            }
+
+            getRGBColor(r, g, b) {
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+
+            updateDisplayMode() {
+                this.dmxGrid.className = `grid ${this.displayMode}-mode`;
+                this.updateGridStyle();
+                this.currentModeSpan.textContent = this.displayMode === 'color' 
+                    ? `RGB Color (${Math.floor(this.channelCount / 3)} fixtures)` 
+                    : `Single Channel (${this.channelCount} channels)`;
+            }
+
+            updateGridStyle() {
+                const columns = Math.min(
+                    this.displayMode === 'color' ? Math.ceil(this.channelCount / 3) : this.channelCount, 
+                    100
+                );
+                this.dmxGrid.style.gridTemplateColumns = `repeat(${columns}, 12px)`;
+            }
+
+            renderFrame() {
+                if (!this.dmxData[this.currentFrame]) return;
+
+                this.dmxGrid.innerHTML = '';
+                const data = this.displayMode === 'color' ? this.getColorData() : this.getMonoData();
+                
+                data.forEach(item => {
+                    const box = document.createElement('div');
+                    box.className = 'box';
+                    box.style.backgroundColor = item.color;
+                    box.dataset.info = this.displayMode === 'color' 
+                        ? `Ch: ${item.channels.join(',')} Val: ${item.values.join(',')}`
+                        : `Ch: ${item.channel} Val: ${item.value}`;
+                    this.dmxGrid.appendChild(box);
+                });
+
+                this.updateTimelineProgress();
+                this.updateFrameCount();
+            }
+
+            getColorData() {
+                const colorBoxes = [];
+                const maxFixtures = Math.floor(this.channelCount / 3);
+                
+                for (let i = 0; i < maxFixtures * 3; i += 3) {
+                    if (i >= this.dmxData[this.currentFrame].length) break;
+                    
+                    colorBoxes.push({
+                        color: this.getRGBColor(
+                            this.dmxData[this.currentFrame][i] || 0,
+                            this.dmxData[this.currentFrame][i + 1] || 0,
+                            this.dmxData[this.currentFrame][i + 2] || 0
+                        ),
+                        channels: [i + 1, i + 2, i + 3],
+                        values: [
+                            this.dmxData[this.currentFrame][i] || 0,
+                            this.dmxData[this.currentFrame][i + 1] || 0,
+                            this.dmxData[this.currentFrame][i + 2] || 0
+                        ]
+                    });
+                }
+                return colorBoxes;
+            }
+
+            getMonoData() {
+                const maxChannels = Math.min(this.channelCount, this.dmxData[this.currentFrame].length);
+                return Array.from({length: maxChannels}, (_, index) => ({
+                    color: this.getMonoColor(this.dmxData[this.currentFrame][index] || 0),
+                    channel: index + 1,
+                    value: this.dmxData[this.currentFrame][index] || 0
+                }));
+            }
+
+            togglePlayback() {
+                if (this.isPlaying) {
+                    this.stopPlayback();
+                } else {
+                    this.startPlayback();
+                }
+            }
+
+            startPlayback() {
+                this.currentFrame = 0;
+                
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+                
+                this.isPlaying = true;
+                this.playButton.textContent = 'Stop';
+                
+                this.renderFrame();
+                
+                this.playInterval = setInterval(() => {
+                    if (this.currentFrame >= this.dmxData.length - 1) {
+                        if (this.continueMode) {
+                            this.currentFrame = 0;
+                        } else {
+                            this.stopPlayback();
+                            return;
+                        }
+                    } else {
+                        this.currentFrame++;
+                    }
+                    this.renderFrame();
+                }, this.dwellTime);
+            }
+
+            stopPlayback() {
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+                this.isPlaying = false;
+                this.playButton.textContent = 'Play';
+                this.currentFrame = 0;
+                this.renderFrame();
+            }
+
+            updateTimelineProgress() {
+                const progress = (this.currentFrame / (this.dmxData.length - 1)) * 100;
+                this.timelineProgress.style.width = `${progress}%`;
+            }
+
+            updateFrameCount() {
+                this.frameCountSpan.textContent = `${this.currentFrame + 1} / ${this.dmxData.length}`;
+            }
+
+            updateInfo() {
+                this.dwellTimeSpan.textContent = this.dwellTime;
+                this.totalFramesSpan.textContent = this.totalFrames;
+                this.updateFrameCount();
+            }
+        }
+
+        // Initialize simulator
+        const simulator = new DMXSimulator();
+    </script>
+</body>
+</html>
