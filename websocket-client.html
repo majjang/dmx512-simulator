@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>제어 시스템</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        #loginScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        /* 서버 연결 컨테이너 스타일 추가 */
+        .server-connection-container {
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .server-connection-container button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+        }
+
+        .server-connection-container button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .connection-status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            background: red;
+            margin-left: 10px;
+            vertical-align: middle;
+            transition: background-color 0.3s ease;
+        }
+
+        .connected {
+            background: #4CAF50;
+        }
+
+        .login-box {
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .login-box input {
+            padding: 10px;
+            width: 200px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .login-box button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .password-error {
+            color: red;
+            display: none;
+            margin-top: 10px;
+        }
+
+        #mainScreen {
+            display: none;
+            padding: 20px;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            margin-right: 5px;
+            border: none;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .command-button {
+            width: 120px;
+            height: 120px;
+            margin: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f8f8f8;
+            transition: all 0.2s ease;
+        }
+
+        .command-button:hover {
+            background: #e8e8e8;
+            transform: scale(1.02);
+        }
+
+        .command-button img {
+    	width: 95%;
+    	height: 95%;
+    	object-fit: contain;
+    	margin-bottom: 5px;
+        }
+
+        .command-button span {
+            display: none;
+            text-align: center;
+            font-size: 14px;
+            padding: 0 5px;
+        }
+
+        .command-button:not(:has(img)) span {
+            display: block;
+        }
+
+        .setup-item {
+            margin: 5px 0;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fff;
+        }
+
+        .setup-item h3 {         /* 새로 추가된 스타일 */
+    	margin: 0 0 8px 0;
+        }
+
+.setup-item input[type="text"],
+.setup-item input[type="password"] {
+    width: calc(100% - 16px);
+    padding: 5px;
+    margin: 4px 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+        .file-input {
+            display: none;
+        }
+
+        .connection-status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            background: red;
+            margin-left: 10px;
+            vertical-align: middle;
+            transition: background-color 0.3s ease;
+        }
+
+        .connected {
+            background: #4CAF50;
+        }
+
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 20px;
+            background: #fff;
+        }
+
+        .add-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .add-btn:hover {
+            background: #45a049;
+        }
+
+        .remove-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background-color 0.2s ease;
+        }
+
+        .remove-btn:hover {
+            background: #ff1111;
+        }
+
+        .title-display {
+            font-size: 24px;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .sent {
+            background-color: #e3f2fd;
+            margin-left: 20px;
+        }
+
+        .received {
+            background-color: #f5f5f5;
+            margin-right: 20px;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 3px solid #c62828;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <!-- 로그인 화면 -->
+    <div id="loginScreen">
+        <div class="login-box">
+            <h2>제어 시스템</h2>
+            <input type="password" id="passwordInput" placeholder="비밀번호를 입력하세요">
+            <div class="password-error">비밀번호가 일치하지 않습니다.</div>
+            <button onclick="checkPassword()">로그인</button>
+        </div>
+    </div>
+
+    <!-- 메인 화면 -->
+    <div id="mainScreen">
+        <!-- 탭 버튼 -->
+        <div>
+            <button class="tab-button active" onclick="showTab('control')">제어</button>
+            <button class="tab-button" onclick="showTab('settings')">설정</button>
+        </div>
+
+        <!-- 제어 탭 -->
+        <div id="control" class="tab-content active">
+            <div id="titleDisplay" class="title-display">제어 화면</div>
+            <div id="commandContainer" style="display: flex; flex-wrap: wrap;"></div>
+            <div id="messages"></div>
+
+        <!-- 서버 연결 컨테이너 추가 -->
+        <div class="server-connection-container">
+            <button id="controlConnectBtn" onclick="connectToServer()">서버 연결</button>
+            <button id="controlDisconnectBtn" onclick="disconnectServer()" style="display: none;">연결 해제</button>
+            <div class="connection-status" id="controlConnectionStatus"></div>
+        </div>
+
+        </div>
+
+        <!-- 설정 탭 -->
+        <div id="settings" class="tab-content">
+            <!-- 비밀번호 설정 -->
+            <div class="setup-item">
+                <h3>비밀번호 설정</h3>
+                <input type="password" id="currentPassword" placeholder="현재 비밀번호">
+                <input type="password" id="newPassword" placeholder="새 비밀번호">
+                <input type="password" id="confirmPassword" placeholder="새 비밀번호 확인">
+                <button onclick="changePassword()">비밀번호 변경</button>
+            </div>
+
+            <!-- 타이틀 설정 -->
+            <div class="setup-item">
+                <h3>제어화면 타이틀</h3>
+		<input type="text" id="titleInput" placeholder="제어화면 타이틀 입력">
+            </div>
+
+            <!-- 서버 설정 -->
+            <div class="setup-item">
+                <h3>서버 연결</h3>
+		<input type="text" id="serverAddress" placeholder="서버 IP 주소">
+            </div>
+
+            <!-- 명령어 설정 -->
+            <div class="setup-item">
+                <h3>명령어 설정</h3>
+                <div id="commandList"></div>
+                <button onclick="addCommand()" class="add-btn">+ 명령 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스크립트는 여기에 추가됩니다 -->
+<script>
+    // 전역 변수
+    let ws = null;
+    let commands = [];
+    let Password = '5935';      // 로그인 비밀번호
+    let settingsPassword2 = '2222';   // 설정 접근 비밀번호
+    let serverAddress = '192.168.0.20';   // 기본 서버 주소 추가
+    let isAuthenticated = false;
+    let connectionCheckInterval;
+
+    // 페이지 로드 시 초기화
+    window.onload = function() {
+        // 저장된 비밀번호 불러오기
+         
+        const savedPassword = Password;
+        if (savedPassword) {
+            password = savedPassword;
+        } else {
+            localStorage.setItem('password', password);
+        }
+
+    // 저장된 서버 주소 불러오기
+    const savedServerAddress = localStorage.getItem('serverAddress');
+    if (savedServerAddress) {
+        serverAddress = savedServerAddress;
+    } else {
+        localStorage.setItem('serverAddress', serverAddress);
+    }
+    document.getElementById('serverAddress').value = serverAddress;
+
+    // 서버 주소 입력필드 변경 이벤트
+    document.getElementById('serverAddress').addEventListener('change', function(e) {
+        serverAddress = e.target.value;
+        localStorage.setItem('serverAddress', serverAddress);
+    });
+
+        // Enter 키 이벤트
+        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // 타이틀 입력 이벤트
+        document.getElementById('titleInput').addEventListener('input', function(e) {
+            const title = e.target.value || '제어 화면';
+            document.getElementById('titleDisplay').textContent = title;
+            localStorage.setItem('controlTitle', title);
+        });
+
+        // 저장된 타이틀 로드
+        const savedTitle = localStorage.getItem('controlTitle');
+        if (savedTitle) {
+            document.getElementById('titleInput').value = savedTitle;
+            document.getElementById('titleDisplay').textContent = savedTitle;
+        }
+
+        // 저장된 명령어 로드
+        loadSavedCommands();
+
+        // 초기 화면 설정
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('mainScreen').style.display = 'none';
+    };
+
+    // 비밀번호 확인
+    function checkPassword() {
+        const input = document.getElementById('passwordInput');
+        const errorDiv = document.querySelector('.password-error');
+        
+        if (input.value === password) {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainScreen').style.display = 'block';
+            errorDiv.style.display = 'none';
+            isAuthenticated = true;
+        } else {
+            errorDiv.style.display = 'block';
+            isAuthenticated = false;
+        }
+        input.value = '';
+    }
+
+    // 비밀번호 변경
+    function changePassword() {
+        if (!isAuthenticated) {
+            alert('로그인이 필요합니다.');
+            return;
+        }
+
+        const currentInput = document.getElementById('currentPassword');
+        const newInput = document.getElementById('newPassword');
+        const confirmInput = document.getElementById('confirmPassword');
+
+        if (currentInput.value !== password) {
+            alert('현재 비밀번호가 일치하지 않습니다.');
+            return;
+        }
+
+        if (newInput.value !== confirmInput.value) {
+            alert('새 비밀번호가 일치하지 않습니다.');
+            return;
+        }
+
+        if (newInput.value.length < 4) {
+            alert('비밀번호는 4자리 이상이어야 합니다.');
+            return;
+        }
+
+        password = newInput.value;
+        localStorage.setItem('password', password);
+        alert('비밀번호가 변경되었습니다.');
+
+        currentInput.value = '';
+        newInput.value = '';
+        confirmInput.value = '';
+    }
+
+    // 탭 전환
+function showTab(tabId) {
+    // 설정 탭으로 이동하려 할 때 비밀번호 확인
+    if (tabId === 'settings') {
+        const settingsPassword = prompt('설정 접근을 위한 비밀번호를 입력하세요.');
+        //if (settingsPassword !== settingsPassword2) {
+        if (settingsPassword !== localStorage.getItem('password')) {
+            alert('비밀번호가 일치하지 않습니다.');
+            return;
+        }
+    }
+
+    // 기존 탭 전환 로직
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+    });
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // 새로운 탭 활성화
+    document.getElementById(tabId).style.display = 'block';
+    document.getElementById(tabId).classList.add('active');
+    document.querySelector(`button[onclick*="${tabId}"]`).classList.add('active');
+}
+</script>
+<script>
+    // 명령어 관리 함수들
+    function generateCommandId() {
+        return 'cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function addCommand() {
+        commands.push({ id: generateCommandId() });
+        saveCommands();
+        updateCommandSetupUI();
+        createCommandButtons();
+    }
+
+    function removeCommand(id) {
+        commands = commands.filter(cmd => cmd.id !== id);
+        localStorage.removeItem(id + '_content');
+        localStorage.removeItem(id + '_name');
+        localStorage.removeItem(id + '_image');
+        saveCommands();
+        updateCommandSetupUI();
+        createCommandButtons();
+    }
+
+    function loadSavedCommands() {
+        const savedCommands = localStorage.getItem('commands');
+        if (savedCommands) {
+            commands = JSON.parse(savedCommands);
+        } else {
+            commands = [{ id: generateCommandId() }];
+        }
+        updateCommandSetupUI();
+        createCommandButtons();
+    }
+
+    function saveCommands() {
+        localStorage.setItem('commands', JSON.stringify(commands));
+    }
+
+    function updateCommandSetupUI() {
+        const commandList = document.getElementById('commandList');
+        commandList.innerHTML = '';
+        
+        commands.forEach((cmd, index) => {
+            const div = document.createElement('div');
+            div.className = 'command-setup';
+            div.style.margin = '10px 0';
+            div.style.padding = '10px';
+            div.style.border = '1px solid #ddd';
+            div.style.borderRadius = '5px';
+
+            div.innerHTML = `
+    <span>명령${index + 1}:</span>
+    <input type="file" id="${cmd.id}_file" class="file-input" accept=".txt">
+    <button onclick="document.getElementById('${cmd.id}_file').click()">파일 선택</button>
+    <span id="${cmd.id}_name">${localStorage.getItem(cmd.id + '_name') || ''}</span>
+    <br>
+    <small style="color: #666; margin-left: 5px;">* 파일 내용이 수정된 경우 다시 선택해주세요</small>  👈 여기
+    <input type="file" id="${cmd.id}_image" class="file-input" accept="image/*">
+    <button onclick="document.getElementById('${cmd.id}_image').click()">이미지 선택</button>
+    <button onclick="removeCommand('${cmd.id}')" class="remove-btn">삭제</button>
+`;
+            commandList.appendChild(div);
+
+            // 파일 선택 이벤트 리스너
+            document.getElementById(cmd.id + '_file').addEventListener('change', function(e) {
+                handleFileSelect(e, cmd.id);
+            });
+
+            // 이미지 선택 이벤트 리스너
+            document.getElementById(cmd.id + '_image').addEventListener('change', function(e) {
+                handleImageSelect(e, cmd.id);
+            });
+        });
+    }
+
+    // 파일 처리 함수들
+    function handleFileSelect(e, cmdId) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                localStorage.setItem(cmdId + '_content', e.target.result);
+                localStorage.setItem(cmdId + '_name', file.name);
+                document.getElementById(cmdId + '_name').textContent = file.name;
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    function handleImageSelect(e, cmdId) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                localStorage.setItem(cmdId + '_image', e.target.result);
+                createCommandButtons();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // 명령어 버튼 생성
+    function createCommandButtons() {
+      const container = document.getElementById('commandContainer');
+    container.innerHTML = '';
+    
+    commands.forEach((cmd, index) => {
+        const button = document.createElement('button');
+        button.className = 'command-button';
+        
+        const savedImage = localStorage.getItem(cmd.id + '_image');
+        if (savedImage) {
+            const img = document.createElement('img');
+            img.src = savedImage;
+            img.alt = `명령${index + 1}`;
+            button.appendChild(img);
+        }
+
+        const span = document.createElement('span');
+        span.textContent = `명령${index + 1}`;
+        button.appendChild(span);
+
+        // 명령어 전송 이벤트
+        button.addEventListener('click', async () => {
+            const commandContent = localStorage.getItem(cmd.id + '_content');
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('서버에 연결되어 있지 않습니다.', 'error');
+                return;
+            }
+            if (!commandContent) {
+                addMessage('명령어 파일을 선택해주세요.', 'error');
+                return;
+            }
+
+            // 파일 내용을 줄 단위로 분리하고 빈 줄 제거
+            const lines = commandContent.split('\n').filter(line => line.trim() !== '');
+            
+            // 각 줄을 순차적으로 전송
+            for (let i = 0; i < lines.length; i++) {
+                try {
+                    await sendCommand(lines[i].trim(), i + 1, lines.length);
+                    // 각 라인 전송 후 100ms 대기
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                    addMessage(`명령어 전송 실패 (${i + 1}/${lines.length}): ${error.message}`, 'error');
+                    break;
+                }
+            }
+        });
+
+        container.appendChild(button);
+    });
+}
+
+    // WebSocket 관련 함수들
+function connectToServer() {
+            //const serverAddress = document.getElementById('serverAddress').value;
+            if (!serverAddress) {
+                alert('설정 탭에서 서버 IP 주소를 입력해주세요.');
+                return;
+            }
+
+    if (ws) {
+        ws.close();
+    }
+
+            try {
+                const statusLED = document.getElementById('controlConnectionStatus');
+                const connectBtn = document.getElementById('controlConnectBtn');
+                const disconnectBtn = document.getElementById('controlDisconnectBtn');
+
+                connectBtn.disabled = true;
+                ws = new WebSocket(`ws://${serverAddress}:1880/ws`);
+                
+                ws.onopen = function() {
+                    statusLED.classList.add('connected');
+                    connectBtn.style.display = 'none';
+                    disconnectBtn.style.display = 'inline';
+                    addMessage('서버에 연결되었습니다.', 'received');
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const response = JSON.parse(event.data);
+                        addMessage(`서버 응답: ${JSON.stringify(response, null, 2)}`, 'received');
+                    } catch {
+                        addMessage(`서버 응답: ${event.data}`, 'received');
+                    }
+                };
+                
+                ws.onclose = function() {
+                    handleDisconnection();
+                };
+
+                ws.onerror = function(error) {
+                    handleDisconnection();
+                    addMessage('연결 오류가 발생했습니다.', 'error');
+                };
+            } catch (error) {
+                handleDisconnection();
+                addMessage('연결 오류가 발생했습니다.', 'error');
+            }
+        }
+
+    // 연결 상태 주기적 체크
+    function startConnectionCheck() {
+        if (connectionCheckInterval) {
+            clearInterval(connectionCheckInterval);
+        }
+        
+        connectionCheckInterval = setInterval(() => {
+            if (ws && ws.readyState !== WebSocket.OPEN) {
+                handleDisconnection();
+                addMessage('서버와의 연결이 끊어졌습니다.', 'error');
+            }
+        }, 5000); // 5초마다 체크
+    }
+
+        function disconnectServer() {
+            if (ws) {
+                ws.close(1000, "사용자가 연결을 종료했습니다.");
+            }
+            if (connectionCheckInterval) {
+                clearInterval(connectionCheckInterval);
+            }
+            handleDisconnection();
+        }
+
+         function handleDisconnection() {
+            const statusLED = document.getElementById('controlConnectionStatus');
+            const connectBtn = document.getElementById('controlConnectBtn');
+            const disconnectBtn = document.getElementById('controlDisconnectBtn');
+
+            statusLED.classList.remove('connected');
+            connectBtn.style.display = 'inline-block';
+            connectBtn.disabled = false;
+            disconnectBtn.style.display = 'none';
+            
+            if (connectionCheckInterval) {
+                clearInterval(connectionCheckInterval);
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+    function addMessage(message, type = 'sent') {
+        const messagesDiv = document.getElementById('messages');
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type}`;
+        messageElement.textContent = message;
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function handleReceivedMessage(message) {
+        try {
+            const data = JSON.parse(message);
+            if (data.status === 'success') {
+                addMessage(`명령 실행 성공: ${data.message}`, 'received');
+            } else {
+                addMessage(`명령 실행 실패: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            addMessage(message, 'received');
+        }
+    }
+
+ async function sendCommand(command, currentLine, totalLines) {
+    if (!ws) {
+        throw new Error('서버 연결이 없습니다.');
+    }
+
+    if (ws.readyState !== WebSocket.OPEN) {
+        handleDisconnection();
+        throw new Error('서버와의 연결이 끊어졌습니다. 다시 연결해주세요.');
+    }
+
+    try {
+        ws.send(command);
+        addMessage(`명령어 전송 (${currentLine}/${totalLines}): ${command}`, 'sent');
+    } catch (error) {
+        console.error('전송 오류:', error);
+        throw new Error('명령어 전송 중 오류가 발생했습니다.');
+    }
+}
+
+    // 페이지 종료 시 연결 해제
+    window.onbeforeunload = function() {
+        if (ws) {
+            ws.close();
+        }
+    };
+</script>
+</body>
+</html>
