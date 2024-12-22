@@ -356,7 +356,24 @@
     let serverAddress = '192.168.0.20';   // 기본 서버 주소 추가
     let isAuthenticated = false;
     let connectionCheckInterval;
+    let pingInterval;  // 이 줄 추가
 
+// Ping 메시지 전송 시작
+function startPingInterval() {
+    if (pingInterval) {
+        clearInterval(pingInterval);
+    }
+    pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            try {
+                ws.send('ping');
+            } catch (error) {
+                console.error('Ping error:', error);
+                handleDisconnection();
+            }
+        }
+    }, 30000); // 30초마다 ping
+}
     // 페이지 로드 시 초기화
     window.onload = function() {
         // 저장된 비밀번호 불러오기
@@ -647,53 +664,80 @@ function showTab(tabId) {
 
     // WebSocket 관련 함수들
 function connectToServer() {
-            //const serverAddress = document.getElementById('serverAddress').value;
-            if (!serverAddress) {
-                alert('설정 탭에서 서버 IP 주소를 입력해주세요.');
-                return;
-            }
-
-    if (ws) {
-        ws.close();
+    if (!serverAddress) {
+        alert('설정 탭에서 서버 IP 주소를 입력해주세요.');
+        return;
     }
 
-            try {
-                const statusLED = document.getElementById('controlConnectionStatus');
-                const connectBtn = document.getElementById('controlConnectBtn');
-                const disconnectBtn = document.getElementById('controlDisconnectBtn');
-
-                connectBtn.disabled = true;
-                ws = new WebSocket(`ws://${serverAddress}:1880/ws`);
-                
-                ws.onopen = function() {
-                    statusLED.classList.add('connected');
-                    connectBtn.style.display = 'none';
-                    disconnectBtn.style.display = 'inline';
-                    addMessage('서버에 연결되었습니다.', 'received');
-                };
-                
-                ws.onmessage = function(event) {
-                    try {
-                        const response = JSON.parse(event.data);
-                        addMessage(`서버 응답: ${JSON.stringify(response, null, 2)}`, 'received');
-                    } catch {
-                        addMessage(`서버 응답: ${event.data}`, 'received');
-                    }
-                };
-                
-                ws.onclose = function() {
-                    handleDisconnection();
-                };
-
-                ws.onerror = function(error) {
-                    handleDisconnection();
-                    addMessage('연결 오류가 발생했습니다.', 'error');
-                };
-            } catch (error) {
-                handleDisconnection();
-                addMessage('연결 오류가 발생했습니다.', 'error');
-            }
+    // 이전 연결이 있다면 정리
+    if (ws) {
+        try {
+            ws.close();
+            ws = null;
+        } catch (err) {
+            console.error('Previous connection cleanup error:', err);
         }
+    }
+
+    // 연결 시도 전 상태 초기화
+    const statusLED = document.getElementById('controlConnectionStatus');
+    const connectBtn = document.getElementById('controlConnectBtn');
+    const disconnectBtn = document.getElementById('controlDisconnectBtn');
+    
+    statusLED.classList.remove('connected');
+    connectBtn.disabled = true;
+
+    try {
+        // WebSocket URL 생성
+        const wsUrl = `ws://${serverAddress}:1880/ws`;
+        console.log('Attempting to connect to:', wsUrl);
+        
+        ws = new WebSocket(wsUrl);
+
+        // 연결 시도 타임아웃 설정
+        const connectionTimeout = setTimeout(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+                ws.close();
+                handleDisconnection();
+                addMessage('연결 시도 시간 초과', 'error');
+            }
+        }, 5000);
+
+ws.onmessage = function(event) {
+    if (event.data === 'pong') {
+        return; // ping-pong 메시지는 무시
+    }
+    
+    try {
+        const response = JSON.parse(event.data);
+        addMessage(`서버 응답: ${JSON.stringify(response, null, 2)}`, 'received');
+    } catch {
+        addMessage(`서버 응답: ${event.data}`, 'received');
+    }
+};
+        ws.onopen = function() {
+            clearTimeout(connectionTimeout);
+            statusLED.classList.add('connected');
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'inline';
+            connectBtn.disabled = false;
+            addMessage('서버에 연결되었습니다.', 'received');
+            
+            // 연결 유지를 위한 ping 메시지 전송
+            startPingInterval();
+        };
+
+        ws.onerror = function(error) {
+            clearTimeout(connectionTimeout);
+            console.error('WebSocket Error:', error);
+            handleDisconnection();
+            addMessage('연결 오류가 발생했습니다. 서버 주소와 포트를 확인해주세요.', 'error');
+        };
+    } catch (error) {
+        handleDisconnection();
+        addMessage('연결 시도 중 오류가 발생했습니다.', 'error');
+    }
+}
 
     // 연결 상태 주기적 체크
     function startConnectionCheck() {
@@ -719,25 +763,25 @@ function connectToServer() {
             handleDisconnection();
         }
 
-         function handleDisconnection() {
-            const statusLED = document.getElementById('controlConnectionStatus');
-            const connectBtn = document.getElementById('controlConnectBtn');
-            const disconnectBtn = document.getElementById('controlDisconnectBtn');
+function handleDisconnection() {
+    const statusLED = document.getElementById('controlConnectionStatus');
+    const connectBtn = document.getElementById('controlConnectBtn');
+    const disconnectBtn = document.getElementById('controlDisconnectBtn');
 
-            statusLED.classList.remove('connected');
-            connectBtn.style.display = 'inline-block';
-            connectBtn.disabled = false;
-            disconnectBtn.style.display = 'none';
-            
-            if (connectionCheckInterval) {
-                clearInterval(connectionCheckInterval);
-            }
-            
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-        }
+    statusLED.classList.remove('connected');
+    connectBtn.style.display = 'inline-block';
+    connectBtn.disabled = false;
+    disconnectBtn.style.display = 'none';
+    
+    if (pingInterval) {
+        clearInterval(pingInterval);
+    }
+    
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+}
 
     function addMessage(message, type = 'sent') {
         const messagesDiv = document.getElementById('messages');
